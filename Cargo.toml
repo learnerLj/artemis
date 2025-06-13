@@ -5,16 +5,20 @@ members = [
     "crates/artemis-core",
     "crates/generator",
     "crates/strategies/*",
-    "crates/clients/*", 
+    "crates/clients/*",
     "examples/*",
 ]
+resolver = "2"
 
 default-members = ["bin/artemis", "bin/cli"]
 
 [workspace.dependencies]
 ## eth
-ethers = { version = "2", features = ["ws", "rustls"]}
+ethers = { version = "2", features = ["ws", "rustls"] }
 ethers-signers = "2.0"
+
+## wasm
+wasm-bindgen = "0.2.88"
 
 
 [profile.release]
@@ -22,4 +26,3 @@ panic = 'abort'
 
 [profile.dev]
 panic = 'abort'
-

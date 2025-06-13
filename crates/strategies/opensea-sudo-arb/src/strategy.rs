@@ -233,7 +233,7 @@ impl<M: Middleware + 'static> OpenseaSudoArb<M> {
                 self.pool_bids.insert(pool_address, quote.price);
                 self.sudo_pools
                     .entry(quote.nft_address)
-                    .or_insert(vec![])
+                    .or_default()
                     .push(pool_address);
             }
             // If a quote is unavailable, remove from both the pool_bids and the sudo_pools maps.
