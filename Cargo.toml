@@ -1,16 +1,16 @@
 [workspace]
 members = [
-    "bin/artemis",
-    "bin/cli",
-    "crates/artemis-core",
-    "crates/generator",
-    "crates/strategies/*",
-    "crates/clients/*",
+    "apps/artemis",
+    "apps/cli",
+    "artemis-core",
+    "generator",
+    "strategies/*",
+    "clients/*",
     "examples/*",
 ]
 resolver = "2"
 
-default-members = ["bin/artemis", "bin/cli"]
+default-members = ["apps/artemis", "apps/cli"]
 
 [workspace.dependencies]
 ## eth
