@@ -1,11 +1,10 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use ethers::types::Transaction;
-use fiber::{
-    eth::{CompactBeaconBlock, ExecutionPayload, ExecutionPayloadHeader},
-    Client,
-};
+use fiber::Client;
 use futures::StreamExt;
+
+// Use the actual types returned by fiber streams
+use alloy_consensus::{Block, TxEnvelope};
 
 use artemis_core::types::{Collector, CollectorStream};
 
@@ -16,26 +15,16 @@ const FIBER_DEFAULT_URL: &str = "beta.fiberapi.io:8080";
 #[allow(clippy::large_enum_variant)]
 #[allow(missing_docs)]
 pub enum Event {
-    Transaction(Transaction),
-    ExectionHeader(ExecutionPayloadHeader),
-    ExecutionPayload(ExecutionPayload),
-    BeaconBlock(CompactBeaconBlock),
+    Transaction(TxEnvelope),
+    ExecutionPayload(Block<TxEnvelope>),
 }
 
 /// Fiber collector stream type, used to specify which stream to subscribe to.
 pub enum StreamType {
     /// Subscribe to new pending transactions as seen by the Fiber network.
     Transactions,
-    /// Subscribe to new [ExecutionPayloadHeader]s, which contain the block header without the
-    /// transaction objects. This stream is (on avg) 20-30ms faster than the [StreamType::ExecutionPayloads].
-    ExecutionHeaders,
-    /// Subscribe to new [ExecutionPayload]s, which contain both the block header and the full
-    /// transaction objects as [ethers::types::Transaction]s.
+    /// Subscribe to new execution payloads (blocks with full transaction data).
     ExecutionPayloads,
-    /// Subscribe to new [CompactBeaconBlock]s, which contain the consensus-layer block info.
-    /// Refer to the official [Fiber-rs client types](https://github.com/chainbound/fiber-rs/blob/c2f28b28250d52ebb6591d7517e55ead98c041d0/src/eth.rs#L173)
-    /// for more info on the streamed objects.
-    BeaconBlocks,
 }
 
 /// A Fiber collector that subscribes to the specified stream type.
@@ -55,7 +44,7 @@ impl FiberCollector {
     /// - `api_key`: The Fiber API key to use
     /// - `ty`: The type of stream to subscribe to
     pub async fn new(api_key: String, ty: StreamType) -> Self {
-        let client = Client::connect(FIBER_DEFAULT_URL.into(), api_key.clone())
+        let client = Client::connect(FIBER_DEFAULT_URL, api_key.clone())
             .await
             .expect("failed to connect to Fiber");
 
@@ -68,7 +57,7 @@ impl FiberCollector {
 
     /// Optionally set the Fiber endpoint, overriding the default
     pub async fn set_fiber_endpoint(&mut self, endpoint: impl Into<String>) {
-        self.client = Client::connect(endpoint.into(), self.api_key.clone())
+        self.client = Client::connect(endpoint, self.api_key.clone())
             .await
             .expect("failed to connect to Fiber");
     }
@@ -77,23 +66,13 @@ impl FiberCollector {
     pub async fn get_event_stream(&self) -> Result<CollectorStream<'_, Event>> {
         match self.ty {
             StreamType::Transactions => {
-                let stream = self.client.subscribe_new_txs(None).await;
-                let stream = stream.map(Event::Transaction);
-                Ok(Box::pin(stream))
-            }
-            StreamType::ExecutionHeaders => {
-                let stream = self.client.subscribe_new_execution_headers().await;
-                let stream = stream.map(Event::ExectionHeader);
+                let stream = self.client.subscribe_new_transactions(None).await;
+                let stream = stream.map(|tx| Event::Transaction(tx.into_inner()));
                 Ok(Box::pin(stream))
             }
             StreamType::ExecutionPayloads => {
                 let stream = self.client.subscribe_new_execution_payloads().await;
                 let stream = stream.map(Event::ExecutionPayload);
-                Ok(Box::pin(stream))
-            }
-            StreamType::BeaconBlocks => {
-                let stream = self.client.subscribe_new_beacon_blocks().await;
-                let stream = stream.map(Event::BeaconBlock);
                 Ok(Box::pin(stream))
             }
         }
